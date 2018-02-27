@@ -1,0 +1,281 @@
+LoadPackages <- function(packages) {
+  # Load or install packages if they aren't already loaded.
+  #
+  # Args:
+  #   packages: a vector of package names
+  #
+  for (package in packages) {
+    if (!require(package, character.only=T, quietly=T)) {
+      install.packages(package)
+      library(package, character.only=T)
+    }
+  }
+}
+
+LoadPackages(c("readr", "dplyr", "readxl"))
+
+FixSsn <- function(df, id) {
+  # Standarize social security numbers
+  #
+  # Args:
+  # df: Data frame that contains a column for SSNs
+  # id: The SSN column
+  #
+  # Returns a df with a new column of standarized SSNs
+  df <- df %>% mutate(SSN = gsub("-", "",  id))
+  df <- df %>% mutate(SSN = gsub("/", "",  SSN))
+  df <- df %>% mutate(SSN = gsub(" ", "",  SSN))
+  df <- df %>% mutate(SSN = gsub("\\.0$", "",  SSN))
+  # some ssn is 12345678.0 so replace the .0 with empty space
+  df <- df %>% mutate(SSN = ifelse(nchar(SSN) < 9, paste0(0,SSN), SSN))
+  df <- df %>% mutate(SSN = ifelse(nchar(SSN) < 9, paste0(0,SSN), SSN))
+  df <- df %>% select(SSN, everything())
+  ifelse(nchar(df$SSN) == 9, print("ssn is 9 digits long"), 
+         print("some ssn are not 9 digit long"))
+  return(df)
+}
+
+ZeroVarCols <- function(df) {
+  # Column names that have zero variance. (NA counts as unique value)
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  vector of column names with zero variance 
+  colname.vec <- c()
+  for(col in names(df)) {
+    x <- df[ ,col]
+    len <- nrow((unique(x)))
+    if(len == 1 ) {
+      colname.vec <- c(colname.vec, col)
+    }
+  }
+  return(colname.vec)
+}
+
+CompareDf <- function(df1, df2) {
+  # Compares if two df are the same
+  #
+  # Args:
+  # df1: first data frame to compare
+  # df2: first data frame to compare
+  #
+  # Returns:
+  #  Data frame showing each column name and whether or not they are the same
+  comparison <- compare::compare(df1,df2)
+  comparison_df <- data.frame(comparison$detailedResult)
+  rnames <- data.frame(rownames(comparison_df))
+  comparison_df <- bind_cols(rnames,comparison_df)
+  colnames(comparison_df) <- c('Column_Name', 'Comparison')
+  return(comparison_df)
+}
+
+ColOnlyContains <- function(df, strings) {
+  # Return column names that only contain certain values
+  #
+  # Args:
+  # df: data frame
+  # strings: vector of string(s) (ex. c("string1", "string2"))
+  #
+  # Returns:
+  #  Vector of Column names that only contain certain values (has to contain all of them)
+  df <- as_tibble(df)
+  colNames <- c()
+  lenStr <- length(strings)
+  strings <- stringr::str_to_upper(strings)
+  for (col in names(df)) {
+    unqValues <- c(unique(df[, col]))
+    unqValues <- unqValues[[1]]
+    unqValues <- stringr::str_to_upper(unqValues)
+    unqValues <- setdiff(unqValues, NA)
+    lenUnqValues <- length(unqValues)
+    if(sum(unqValues %in% strings) ==  lenStr & lenUnqValues == lenStr ) {
+      colNames <- c(colNames, col)
+    }
+  }
+  return(colNames)
+}
+
+ColMatchString <- function(df, strings) {
+  # Return column names that match one or more of the strings
+  #
+  # Args:
+  # df: data frame
+  # strings: vector of string(s) (ex. c("string1", "string2"))
+  #
+  # Returns:
+  #  Vector of Column names that matches one or more ofthe strings
+  df <- tbl_df(df)
+  colname_vec <- c()
+  strings <- stringr::str_to_upper(strings)
+  for (col in names(df)) {
+    colName <- stringr::str_to_upper(names(df[,col]))
+    if (sum(stringr::str_detect(colName, strings)) > 0 )  {
+      colname_vec <- c(colname_vec, col)
+    }
+  }
+  return(colname_vec)
+}
+
+IdCols <- function(df) {
+  # Return columns that is unique for each observation and ignore NAs.
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  vector of column names that are unique for each observation
+  v <- c()
+  j <- 1
+  for(i in 1:ncol(df)) {
+    x <- df[ ,i]
+    x <- x[!is.na(x),]
+    len <- nrow(x)
+    x <- x[!duplicated(x), ]
+    unq <- nrow(x)
+    if(unq == len ) {
+      v[j] <- colnames(df[ ,i])
+      j <- j+1
+    }
+  }
+  return(v)
+}
+
+IdCols2 <- function(df) {
+  # Return columns that is unique for each observation and does not ignore NAs
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  vector of column names that are unique for each observation 
+  out <- lapply(df, function(x) length(unique(x)))
+  want <- which((out == nrow(df)))
+  unlist(want)  
+}
+
+ColNa <- function(df) {
+  # Return a vector of column names that have NA values
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  vector of column names that have NAs 
+  df <- tbl_df(df)
+  v <- c()
+  j <- 1
+  for(i in 1:ncol(df)) {
+    x <- df[ ,i]
+    xRmvNA <- x[!is.na(x),]
+    lenx <- nrow(x)
+    lenxRmvNA <- nrow(xRmvNA)
+    if(lenx != lenxRmvNA ) {
+      v[j] <- colnames(df[ ,i])
+      j <- j+1
+    }
+  }
+  return(v)
+}
+
+
+ColNaNotAll <- function(df) {
+  # Find column names that have NA values but they are not all NA values
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  vector of column names that have NAs but not all NAs 
+  df <- tbl_df(df)
+  v <- c()
+  j <- 1
+  for(i in 1:ncol(df)) {
+    x <- df[ ,i]
+    xRmvNA <- x[!is.na(x),]
+    lenx <- nrow(x)
+    lenxRmvNA <- nrow(xRmvNA)
+    if(lenx != lenxRmvNA &  lenxRmvNA > 0) {
+      v[j] <- colnames(df[ ,i])
+      j <- j+1
+    }
+  }
+  return(v)
+}
+
+
+ColNaAllNa <- function(df) {
+  # Find column names that have all NAs
+  #
+  # Args:
+  # df: data frame 
+  #
+  # Returns:
+  #  Vector of Column names that have all NAs
+  df <- tbl_df(df)
+  v <- c()
+  j <- 1
+  for(i in 1:ncol(df)) {
+    x <- df[ ,i]
+    xRmvNA <- x[!is.na(x),]
+    lenx <- nrow(x)
+    lenxRmvNA <- nrow(xRmvNA)
+    if(lenx != lenxRmvNA &  lenxRmvNA == 0) {
+      v[j] <- colnames(df[ ,i])
+      j <- j+1
+    }
+  }
+  return(v)
+}
+
+# ex. cutoffs(glmnet, eval, eval$overall_response, 400,700, 1000) 
+cutoffs <- function(model, test_set, response, low, high, divisor) {
+  pred <- predict(model, test_set, type = "prob")
+  cutoff <- low
+  j <- 1
+  metrics_cutoffs <- data.frame()
+  for(i in low:high){
+    cut <- cutoff / divisor
+    
+    colname <- paste0("cut",cut)
+    pred[[colname]] <- ifelse(pred$pos > cut, "pos","neg")
+    pred[[colname]] <- factor(pred[[colname]])
+    pred[[colname]] <- relevel(pred[[colname]], "pos")
+    cutoff <- cutoff +1
+    
+    cm <- caret::confusionMatrix(pred[[colname]], response, positive = "pos")
+    metrics_cutoffs[j,1] <- cut
+    metrics_cutoffs[j,2] <- cm$overall[1]
+    metrics_cutoffs[j,3] <- cm$overall[2]
+    metrics_cutoffs[j,4] <- cm$byClass[5]
+    metrics_cutoffs[j,5] <- cm$byClass[6]
+    metrics_cutoffs[j,6] <- cm$byClass[2]
+    colnames(metrics_cutoffs) = c('Prob_Cutoff', 'Accuracy', "Kappa", 
+                                  "Precision", "Recall", "Specificity")
+    j <- j+1
+  }
+  mets_pred <-  list(metrics_cutoffs,pred)
+  return(mets_pred)
+}
+
+customSummary <- function (data, lev = NULL, model = NULL) 
+{
+  lvls <- levels(data$obs)
+  if (length(lvls) > 2) 
+    stop(paste("Your outcome has", length(lvls), "levels. The classSummary() function isn't appropriate."))
+  if (!all(levels(data[, "pred"]) == lvls)) 
+    stop("levels of observed and predicted data do not match")
+  data$y = as.numeric(data$obs == lvls[2])
+  prAUC <- MLmetrics::PRAUC(y_pred = data[, lev[1]], y_true = ifelse(data$obs == lev[1], 1, 0))
+  rocAUC <- ModelMetrics::auc(ifelse(data$obs == lev[2], 0,1), data[, lvls[1]])
+  out <- c(prAUC, rocAUC, 
+           caret::sensitivity(data[, "pred"], data[, "obs"], lev[1]), 
+           caret::specificity(data[, "pred"], data[, "obs"], lev[2]),
+           caret::precision(data = data$pred, reference = data$obs, relevant = lev[1]),
+           caret::F_meas(data = data$pred, reference = data$obs, relevant = lev[1]))
+  names(out) <- c("PR-AUC", "ROC-AUC", "Sens/Rec", "Spec", "Prec", "F")
+  out
+}
+
+eightSummary <- function(...) c(customSummary(...), defaultSummary(...))
