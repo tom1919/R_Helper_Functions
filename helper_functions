@@ -322,6 +322,7 @@ summarize_df <- function(df, r = 4) {
     num_missing <- num_na + num_inf + num_nan
     num_unq <- length(unique(not_inf[!is.na(not_inf)])) # NAs and INF values not included
     mode <- names(freq_table) # NAs and INF values not included
+    mode <- ifelse(is.null(mode), NA, mode)
     mode_ratio <- unname(freq_table) / (length(col) - num_missing)
     
     
