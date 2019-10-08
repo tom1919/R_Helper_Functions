@@ -14,6 +14,59 @@ LoadPackages <- function(packages) {
 
 LoadPackages(c("readr", "dplyr", "readxl"))
 
+LoadPackages2 <- function(packages) {
+  # Load or install packages if they aren't already loaded.
+  #
+  # Args:
+  #   packages: a vector of package names
+  #
+  shh <- suppressPackageStartupMessages 
+  
+  # servers that host packages
+  mirrors <- c("https://cloud.r-project.org", 
+               "http://archive.linux.duke.edu/cran/",
+               "https://cran.cnr.berkeley.edu/")
+  
+  for(package in packages) {
+    
+    i = 0
+    
+    # while package is not loaded
+    while(shh(require(package, character.only=T, 
+                      quietly=T, warn.conflicts = F)) == F){
+      
+      i = i + 1
+      
+      cat("\nInstalling package: ", package, "\n")
+      
+      # attempt to install package from mirror i
+      install.packages(package, quiet = T, verbose = F, repos = mirrors[i]) 
+      
+      cat("\nUsing repo: ", mirrors[i])
+      
+      # if package is installed 
+      if(package %in% installed.packages()){ 
+        cat("\nSuccesfully installed package: ", package, "\n")
+      } else {
+        cat("\nFailed install and trying again for package: ", package, "\n")
+      }
+      
+      if(i > 2){ # if 3 installs failed then break
+        break
+      }
+    }
+    
+    # if package is not loaded then...
+    if(shh(require(package, character.only=T, 
+                   quietly=T, warn.conflicts = F) == F)){
+      cat("\nFailed to install package: ", package, "\n")
+    } else {
+      cat("\nSuccesfully loaded the package: ", package, "\n")           
+    }
+    
+  }
+}
+
 FixSsn <- function(df, id) {
   # Standarize social security numbers
   #
