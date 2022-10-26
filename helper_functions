@@ -1,69 +1,37 @@
-LoadPackages <- function(packages) {
-  # Load or install packages if they aren't already loaded.
-  #
-  # Args:
-  #   packages: a vector of package names
-  #
-  for (package in packages) {
-    if (!require(package, character.only=T, quietly=T)) {
-      if (!package %in% installed.packages()) install.packages(package)
-      library(package, character.only=T)
-    }
-  }
+get_pkg_ver <- function(pkg){
+  installed_ver = tryCatch({installed_ver=as.character(packageVersion(pkg))}, 
+                           error=function(e) {installed_ver='NA'})
+  return(installed_ver)
 }
 
-LoadPackages(c("readr", "dplyr", "readxl"))
-
-LoadPackages2 <- function(packages) {
-  # Load or install packages if they aren't already loaded.
-  #
-  # Args:
-  #   packages: a vector of package names
-  #
-  shh <- suppressPackageStartupMessages 
+install_packges <- function(pkg_ver) {
+  #' Installs specific versions of packages if not already installed
+  #'
+  #' @param pkg_ver A dictionary of package names and versions to install
+  #' @usage install_packges(c('CVXR'='1.0-10', 'dplyr'='1.0.7'))
   
-  # servers that host packages
-  mirrors <- c("https://cloud.r-project.org", 
-               "http://archive.linux.duke.edu/cran/",
-               "https://cran.cnr.berkeley.edu/")
+  installed_ver = installed_ver = get_pkg_ver('versions')
+  if (installed_ver == 'NA') {
+    cat('\n', 'installing the versions package', '\n')
+    install.packages('versions', repos = "https://cloud.r-project.org")
+  }
   
-  for(package in packages) {
-    
-    i = 0
-    
-    # while package is not loaded
-    while(shh(require(package, character.only=T, 
-                      quietly=T, warn.conflicts = F)) == F){
-      
-      i = i + 1
-      
-      cat("\nInstalling package: ", package, "\n")
-      
-      # attempt to install package from mirror i
-      install.packages(package, quiet = T, verbose = F, repos = mirrors[i]) 
-      
-      cat("\nUsing repo: ", mirrors[i])
-      
-      # if package is installed 
-      if(package %in% installed.packages()){ 
-        cat("\nSuccesfully installed package: ", package, "\n")
-      } else {
-        cat("\nFailed install and trying again for package: ", package, "\n")
-      }
-      
-      if(i > 2){ # if 3 installs failed then break
-        break
-      }
+  for (i in seq(1, length(pkg_ver))){
+    pkg = names(pkg_ver[i])
+    ver = pkg_ver[i]
+    ver_chk = gsub('-', '.', ver)
+    installed_ver = get_pkg_ver(pkg)
+    cat('\n', 'pkg:', pkg, '|', 'req_ver:', ver_chk, '|', 'installed_ver:', 
+        installed_ver, '\n')
+    if (installed_ver != ver_chk) {
+      cat('\n', 'installing', pkg, '=', ver, '\n')
+      versions::install.versions(pkg, ver)
+      installed_ver = get_pkg_ver(pkg)
+      cat('\n', 'pkg:', pkg, '|', 'req_ver:', ver_chk, '|', 'installed_ver:', 
+          installed_ver, '\n')
+      if (installed_ver != ver_chk) {
+        stop(cat('\n', 'unable to install', pkg, '=', ver, '\n'))}
     }
-    
-    # if package is not loaded then...
-    if(shh(require(package, character.only=T, 
-                   quietly=T, warn.conflicts = F) == F)){
-      cat("\nFailed to install package: ", package, "\n")
-    } else {
-      cat("\nSuccesfully loaded the package: ", package, "\n")           
-    }
-    
   }
 }
 
